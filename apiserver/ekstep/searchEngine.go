@@ -125,7 +125,7 @@ func SearchEngineInit(dbDir, indexName, jsonDir string) {
 	func() {
 		err = EcarDbIndexAddJsonDir(EkstepIndex, jsonDir)
 		if err != nil {
-			logger.Error.Fatal(err)
+			logger.Error.Printf("%v", err)
 		}
 	}()
 }
