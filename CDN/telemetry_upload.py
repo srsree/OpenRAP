@@ -14,9 +14,16 @@ import time, threading
 
 #############
 #Global configurations for build
-regURL = 'https://qa.ekstep.in/api/api-manager/v1/consumer/cdn_device/credential/register'
-tmURL = 'https://qa.ekstep.in/api/data/v3/telemetry'
-app_jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVucmFwLXYxIn0.BlKcxXLMXDe5wGSLIyN7DV6B808Fmi87-OJRHGS0NCE'
+# for qa
+#regURL = 'https://qa.ekstep.in/api/api-manager/v1/consumer/cdn_device/credential/register'
+#tmURL = 'https://qa.ekstep.in/api/data/v3/telemetry'
+#app_jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVucmFwLXYxIn0.BlKcxXLMXDe5wGSLIyN7DV6B808Fmi87-OJRHGS0NCE'
+
+# for production
+regURL = 'https://api.ekstep.in/api-manager/v1/consumer/cdn_device/credential/register'
+tmURL = 'https://api.ekstep.in/data/v3/telemetry'
+app_jwt = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJvcGVucmFwLXYxIn0.OtUIioaagXzOLLZNsPoh-E2pHjsZ6ka-cyP9lLDIW38'
+
 
 JWT_ALGORITHM = "HS256"
 
@@ -118,14 +125,17 @@ def token_generate():
     auth_text = "bearer " + app_jwt
     headers = {'Content-Type': 'application/json', 'Authorization': auth_text}
 
+    status_code = 0
     try:
-        r  = requests.post(url=regURL, data=json.dumps(payload), headers=headers)
+        r  = requests.post(url=regURL, data=json.dumps(payload), headers=headers, verify=False)
+    	status_code = r.status_code
+
         if r.status_code // 100 != 2:
             log.error("Server error: Refused(err: " + r.status_code + " ) ")
             threading.Timer(tm_token_generate_timer_interval, token_generate).start()
             return
     except:
-            log.error("Server error: error generating token ... ")
+            log.error("Server error(%d) generating token" % status_code)
             # Need to try again
             threading.Timer(tm_token_generate_timer_interval, token_generate).start()
             return
@@ -147,7 +157,7 @@ def telemetry_upload_file(filename, jwt, endpoint=tmURL):
 
     fin = open(filename, 'rb')
     try:
-          r  = requests.post(url=endpoint, data=fin, headers=headers)
+          r  = requests.post(url=endpoint, data=fin, headers=headers, verify=False)
           print(r.text)
     finally:
             fin.close()
@@ -170,6 +180,7 @@ def telemetry_upload_dir():
     #
     global tmDir
     tm_dir = tmDir
+    err_msg =""
 
     try:
         try:
@@ -213,7 +224,10 @@ def telemetry_upload_dir():
                 log.info("telemetry upload(%s) status: %s %s" %
                         (filename, es_resp_status, es_resp_errmsg))
                 # delete this file
-                os.remove(filename)
+                try:
+                    os.remove(filename)
+                except:
+                    log.info("Couldn't delete telemetry[%s] after upload\n" % filename)
             elif status == 401:
                 log.info("telemetry upload(%s) status: %d es_status: %s es_err: %s es_errmsg: %s" %
                         (filename, status, es_resp_status, es_resp_err, es_resp_errmsg))
@@ -241,7 +255,8 @@ def telemetry_upload_dir():
         log_current_value  = log_current_value + 1
 
         if log_current_value == 1:
-            log.error(err_msg)
+            if err_msg:
+		 log.error(err_msg)
         elif log_current_value >= log_optimization_limit:
             log_current_value  = 0
             
